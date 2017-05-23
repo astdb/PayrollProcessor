@@ -46,7 +46,6 @@ func ReadTaxBracketsConfig(inputFile string) ([]*IncomeTaxBracket, error) {
 			return brackets, err
 		}
 
-		// TODO: consider sending entire input row to recod creation function
 		if len(row) < 5 { // need at least five fields in a valid record, also check for empty fields
 			// return or collect error and move to next record
 			return nil, fmt.Errorf("readTaxBrackets(): Minimum number of fields not met in input <%s>\n", row)
