@@ -1,7 +1,13 @@
+// PayrollProcessor reads in a set of payroll records from an input CSV file and writes processed data per requirements onto an output CSV file.
+// The code uses internal struct PayrollRecord to model input records and implemets a number of associated methods to that type in order to
+// calculate output parameters. Tax bracket information is stored in a configuration file, TAX_CONFIG.csv. The tax bracket information is managed
+// by a separate custom package, TaxBracket. It reads the tax bracket data and makes it available within the program as required. 
+
 package main
 
+// import required external pakages
 import (
-	"TaxBracket"
+	"TaxBracket" // custom packageL provides functionality to read external tax bracket connfiguration
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -20,13 +26,13 @@ func main() {
 		return
 	}
 
-	inFile := os.Args[1]			// employee details input file
-	taxConfigFile := os.Args[2]		// tax bracket cnfiguration file
+	inFile := os.Args[1]        // employee details input file
+	taxConfigFile := os.Args[2] // tax bracket cnfiguration file
 
 	// read tax bracket configs and handle any errors
 	taxBrackets, err := TaxBracket.ReadTaxBracketsConfig(taxConfigFile)
 	if err != nil {
-		// error reading tax bracket config - quit
+		// error reading tax bracket config - abort with error
 		fmt.Printf("Error reading tax brackets config: %v\n", err)
 		return
 	}
@@ -51,9 +57,9 @@ func readPayrollRecords(inputFile string) ([]*PayrollRecord, error) {
 	// open input file
 	fileHandle, err := os.Open(inputFile)
 	if err != nil {
-		return nil, err	// if an error encountered opening file, return error to caller with nil data (go methods can return multiple values)
+		return nil, err // if an error encountered opening file, return error to caller with nil data (go methods can return multiple values)
 	}
-	defer fileHandle.Close()	// defer file closure so file will auto-close at function return
+	defer fileHandle.Close() // defer file closure so file will auto-close at function return
 
 	// prepare new CSV reader and slice of PayrollRecord objects to read in data
 	csvReader := csv.NewReader(fileHandle)
@@ -61,10 +67,10 @@ func readPayrollRecords(inputFile string) ([]*PayrollRecord, error) {
 
 	// per row in input CSV file
 	for {
-		row, err := csvReader.Read()	// read row
+		row, err := csvReader.Read() // read row
 		if err != nil {
 			if err == io.EOF {
-				err = nil	// if EOF, set error to nil: in that case we'll return nil error and the read set of records
+				err = nil // if EOF, set error to nil: in that case we'll return nil error and the read set of records
 			}
 
 			// return set of records read, along with any error encountered
@@ -75,7 +81,7 @@ func readPayrollRecords(inputFile string) ([]*PayrollRecord, error) {
 		newPayrollRecord, err := createPayrollRecord(row)
 		if err != nil {
 			// output error and move onto next record
-			fmt.Printf("Error creating payroll input record object %v\n", err);
+			fmt.Printf("Error creating payroll input record object %v\n", err)
 			continue
 		}
 
@@ -118,8 +124,8 @@ func (rec *PayrollRecord) incomeTax(taxBrackets []*TaxBracket.IncomeTaxBracket) 
 	perc := 0.0
 	lump := 0.0
 	abv := 0.0
-	set := false	// flag denoting that a fitting tax bracket was found
-	
+	set := false // flag denoting that a fitting tax bracket was found
+
 	// for each tax bracket configured
 	for _, brac := range taxBrackets {
 		if brac.Upper == 0 {
@@ -156,11 +162,11 @@ func (rec *PayrollRecord) incomeTax(taxBrackets []*TaxBracket.IncomeTaxBracket) 
 
 // calculate net income value for this salary (and return any error)
 func (rec *PayrollRecord) netIncome(taxBrackets []*TaxBracket.IncomeTaxBracket) (float64, error) {
-	gross := rec.grossIncome()	// gross monthly income
-	tax, err := rec.incomeTax(taxBrackets)	// monthly tax payable
+	gross := rec.grossIncome()             // gross monthly income
+	tax, err := rec.incomeTax(taxBrackets) // monthly tax payable
 
 	if err != nil {
-		return -1.0, err	// return error if any encountered calculating income tax
+		return -1.0, err // return error if any encountered calculating income tax
 	}
 
 	// sanity check to ensure tax payable isn't larger than gross income
@@ -209,10 +215,12 @@ func createPayrollRecord(inputRow []string) (*PayrollRecord, error) {
 	PaymentDate := strings.TrimSpace(inputRow[4])
 
 	// extract numeric super percentage value e.g. 50 from "50%"
-	rexp, _ := regexp.Compile("^[0-9]+")	// use regular expression to match numeric portion
-	SuperRate_f, err_sr := strconv.ParseFloat(rexp.FindString(SuperRate), 64)	// convert it to numeric value
+	rexp, _ := regexp.Compile("^[0-9]+")                                      // use regular expression to match numeric portion
+	SuperRate_f, err_sr := strconv.ParseFloat(rexp.FindString(SuperRate), 64) // convert it to numeric value
 
-	// sanity check values - return error if invalid
+	// sanity check values
+	// if an error is encountered and the program is unable to create a valid record, a struct instance with
+	// Valid attribute set to false will be returned with an error string rather than aborting.
 	if FirstName == "" || LastName == "" || (err_sal != nil) || (err_sr != nil) || AnnualSalary <= 0 || SuperRate_f < 0 || SuperRate_f > 50 {
 		newRecord.Valid = false
 		newRecord.ErrorStr = fmt.Sprintf("Invalid input record: [%s] [%s] [%s] [%s] [%s]", inputRow[0], inputRow[1], inputRow[2], inputRow[3], inputRow[4])
@@ -235,8 +243,8 @@ func createPayrollRecord(inputRow []string) (*PayrollRecord, error) {
 
 // round() round values to whole dollar (if  >= .50 round up, else round down)
 func round(n float64) float64 {
-	n_floor := math.Floor(n)	// extract whole value
-	n_dec := n - n_floor		// extract decimal portion
+	n_floor := math.Floor(n) // extract whole value
+	n_dec := n - n_floor     // extract decimal portion
 
 	// round up if >= .50
 	if n_dec >= .50 {
@@ -260,14 +268,14 @@ func writeOutputFile(inFileName string, records []*PayrollRecord, taxBrackets []
 	f, err := os.Create(outFileName)
 
 	if err != nil {
-		return fmt.Errorf("Error creating outputfile <%s>: %v", outFileName, err)	// return error if encountered creating file
+		return fmt.Errorf("Error creating outputfile <%s>: %v", outFileName, err) // return error if encountered creating file
 	}
 
-	defer f.Close() 	// defer file closure to function exit
+	defer f.Close() // defer file closure to function exit
 
-	// for each payroll input record 
+	// for each payroll input record
 	for _, rec := range records {
-		if rec.Valid {	// if record is valid
+		if rec.Valid { // if record is valid
 			// get record data
 			name := rec.fullName()
 			payp := rec.payPeriod()
@@ -287,8 +295,14 @@ func writeOutputFile(inFileName string, records []*PayrollRecord, taxBrackets []
 				return fmt.Errorf("Error getting net income: %v", err)
 			}
 
-			// write output			
+			// write output
 			_, err = f.WriteString(fmt.Sprintf("%s, %s, %.0f,%.0f, %.0f, %.0f\n", name, payp, gross, tax, net, super))
+			if err != nil {
+				return fmt.Errorf("Error writing CSV output: %v", err)
+			}
+		} else {
+			// invalid record
+			_, err := f.WriteString("Invalid payroll record: no output.\n")
 			if err != nil {
 				return fmt.Errorf("Error writing CSV output: %v", err)
 			}
